@@ -1,4 +1,10 @@
 # 5300-Instructor
-Instructor's version of CPSC 5300 project, Seattle University, Spring 2022
+Instructor's DB Relation Manager project for CPSC5300/4300 at Seattle U, Spring 2022
 
-Sometime around the Milestone 1 suggested due date, I'll post my solution for Mileston 1 and preliminary code for Milestone 2, in tag Milestone2h.
+Usage (argument is database directory):
+<pre>
+$ ./sql5300 ~/cpsc5300/data
+</pre>
+
+## Tags
+- <code>Milestone1</code> is playing around with the AST returned by the HyLine parser and general setup of the command loop.
