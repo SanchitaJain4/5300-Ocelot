@@ -195,7 +195,7 @@ protected:
 
 
 /**
- * @class ColumnAttribute - holds dataype and other info for a column
+ * @class ColumnAttribute - holds datatype and other info for a column
  */
 class ColumnAttribute {
 public:
@@ -229,7 +229,7 @@ public:
 
     Value(int32_t n) : n(n) { data_type = ColumnAttribute::INT; }
 
-    Value(std::string s) : s(s) { data_type = ColumnAttribute::TEXT; }
+    Value(std::string s) : n(0), s(s) { data_type = ColumnAttribute::TEXT; }
 };
 
 // More type aliases
@@ -314,11 +314,11 @@ public:
     virtual Handle insert(const ValueDict *row) = 0;
 
     /**
-     * Conceptually, execute: UPDATE INTO <table_name> SET <new_valus> WHERE <handle>
+     * Conceptually, execute: UPDATE INTO <table_name> SET <new_values> WHERE <handle>
      * where handle is sufficient to identify one specific record (e.g., returned
      * from an insert or select).
      * @param handle      the row to update
-     * @param new_values  a dictionary keyd by column names for changing columns
+     * @param new_values  a dictionary keyed by column names for changing columns
      */
     virtual void update(const Handle handle, const ValueDict *new_values) = 0;
 
