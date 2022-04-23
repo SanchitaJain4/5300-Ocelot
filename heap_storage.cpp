@@ -87,17 +87,31 @@ void* SlottedPage::address(u16 offset) {
 
 // HeapFile
 
-// TODO
-void HeapFile::create(void);
+// Creates the database file that will store the blocks for a relation
+void HeapFile::create(void) {
+    db_open(DB_CREATE | DB_TRUNCATE);
+    SlottedPage* block = get_new();
+    put(block);
+}
 
-// TODO
-void HeapFile::drop(void);
+// Deletes the database file
+void HeapFile::drop(void) {
+    string file_name = dbfilename.c_str();
+    int result = std::remove(file_name);
+    if (result != 0) {
+        throw "failed to remove the physical file " + file_name;
+}
 
-// TODO
-void HeapFile::open(void);
+// Opens the database file
+void HeapFile::open(void) {
+    db_open();
+}
 
-// TODO
-void HeapFile::close(void);
+// Closes the database file
+void HeapFile::close(void) {
+    db.close(0);
+    closed = true;
+}
 
 // Allocate a new block for the database file.
 // Returns the new empty DbBlock that is managing the records in this block and its block id.
@@ -116,59 +130,118 @@ SlottedPage* HeapFile::get_new(void) {
     return page;
 }
 
-// TODO
-SlottedPage* HeapFile::get(BlockID block_id);
+// Gets a block from the database file for a given block id
+// The client code can then read or modify the block via the DbBlock interface
+SlottedPage* HeapFile::get(BlockID block_id) {
+    Dbt key(&block_id, sizeof(block_id));
+    Dbt data;
+    db.get(nullptr, &key, &data, 0);
+    SlottedPage* page = new SlottedPage(data, block_id);
+    return page;
+}
 
-// TODO
-void HeapFile::put(DbBlock *block);
+// Writes a block to the file
+void HeapFile::put(DbBlock *block) {
+    BlockID block_id(block->get_block_id());
+    Dbt key(&block_id, sizeof(block_id));
+    db.put(nullptr, &key, block->get_block(), 0);
+}
 
-// TODO
-BlockIDs* HeapFile::block_ids();
+// Iterates through all the block ids in the file
+BlockIDs* HeapFile::block_ids() {
+    BlockIDs* ids = new BlockIDs;
+    for (BlockID i = 1; i <= last; i++)
+        ids->push_back(i);
+    return ids;
+}
 
-// TODO
-void HeapFile::db_open(uint flags = 0);
+// Wrapper for Berkeley DB open
+void HeapFile::db_open(uint flags = 0) {
+    if (closed) {
+        db.set_message_stream(&std::cout);
+        db.set_error_stream(&std::cerr);
+        db.set_re_len(DbBlock::BLOCK_SZ);
+        dbfilename = name + ".db";
+        int result = db.open(nullptr, dbfilename.c_str(), nullptr, DB_RECNO, flags, 0);
+        if(result != 0) {
+            close();
+        }
+        closed = false;
+    }
+}
 
 
 // HeapTable
 
 // TODO
-HeapTable::HeapTable(Identifier table_name, ColumnNames column_names, ColumnAttributes column_attributes);
+HeapTable::HeapTable(Identifier table_name, ColumnNames column_names, ColumnAttributes column_attributes) {}
 
 // TODO
-void HeapTable::create();
+void HeapTable::create() {
+    try {
+        file.create();
+    }
+    catch (...) {
+        std::cerr << "Failed to create table" << std::endl;
+    }
+}
 
 // TODO
-void HeapTable::create_if_not_exists();
+void HeapTable::create_if_not_exists() {
+    try {
+        file.create();
+    } catch (...) {
+        file.open();
+    }
+}
 
 // TODO
-void HeapTable::drop();
+void HeapTable::drop() {
+    file.drop();
+}
 
 // TODO
-void HeapTable::open();
+void HeapTable::open() {
+    file.open();
+}
 
 // TODO
-void HeapTable::close();
+void HeapTable::close() {
+    file.close()
+}
 
 // TODO
 Handle HeapTable::insert(const ValueDict *row);
 
 // TODO
-void HeapTable::update(const Handle handle, const ValueDict *new_values);
+void HeapTable::update(const Handle handle, const ValueDict *new_values) {
+    throw "Not implemented"
+}
 
 // TODO
-void HeapTable::del(const Handle handle);
+void HeapTable::del(const Handle handle) {
+    throw "Not implemented"
+}
 
 // TODO
-Handles* HeapTable::select();
+Handles* HeapTable::select() {
+    throw "Not implemented"
+}
 
 // TODO
-Handles* HeapTable::select(const ValueDict *where);
+Handles* HeapTable::select(const ValueDict *where) {
+    throw "Not implemented"
+}
 
 // TODO
-ValueDict* HeapTable::project(Handle handle);
+ValueDict* HeapTable::project(Handle handle) {
+    throw "Not implemented"
+}
 
 // TODO
-ValueDict* HeapTable::project(Handle handle, const ColumnNames *column_names);
+ValueDict* HeapTable::project(Handle handle, const ColumnNames *column_names) {
+    throw "Not implemented"
+}
 
 // TODO
 ValueDict* HeapTable::validate(const ValueDict *row);
