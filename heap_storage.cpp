@@ -66,7 +66,7 @@ bool test_heap_storage() {
 
 
 // SlottedPage
-/*
+
 SlottedPage::SlottedPage(Dbt &block, BlockID block_id, bool is_new) : DbBlock(block, block_id, is_new) {
     if (is_new) {
         this->num_records = 0;
@@ -136,7 +136,7 @@ void SlottedPage::put_n(u16 offset, u16 n) {
 void* SlottedPage::address(u16 offset) {
     return (void*)((char*)this->block.get_data() + offset);
 }
-*/
+
 
 // HeapFile
 
