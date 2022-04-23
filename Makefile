@@ -7,8 +7,8 @@ COURSE = /usr/local/db6
 INCLUDE_DIR = $(COURSE)/include
 LIB_DIR = $(COURSE)/lib
 
-# list of compiled object files required to build the executable
-OBJS = sql5300.o
+# List of compiled object files required to build the executable
+OBJS = sql5300.o heap_storage.o
 
 # General rule for compilation
 %.o: %.cpp
@@ -17,6 +17,9 @@ OBJS = sql5300.o
 # Rule for linking the executable
 sql5300: $(OBJS)
 	g++ -L$(LIB_DIR) -o $@ $< -ldb_cxx -lsqlparser
+
+sql5300.o: heap_storage.h storage_engine.h
+heap_storage.o: heap_storage.h storage_engine.h
 
 # Rule for removing non-source files
 clean:
