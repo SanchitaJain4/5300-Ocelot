@@ -91,20 +91,76 @@ RecordID SlottedPage::add(const Dbt* data) {
     return id;
 }
 
-// TODO
-Dbt* SlottedPage::get(RecordID record_id);
+Dbt* SlottedPage::get(RecordID record_id){
+    u16 size;
+    u16 loc;
+    get_header(size, loc, record_id);
 
-// TODO
-void SlottedPage::put(RecordID record_id, const Dbt &data);
+    char* data = new char[size];
+    memcpy(data, this->address(loc), size);
 
-// TODO
-void SlottedPage::del(RecordID record_id);
+    return new Dbt(data, size);
+}
 
-// TODO
-RecordIDs* SlottedPage::ids(void);
+/*
+ * Replace the current record with provided data
+ */
+void SlottedPage::put(RecordID record_id, const Dbt &data){
+    u16 size;
+    u16 loc;
+    get_header(size, loc, record_id);
 
-// TODO
-virtual void SlottedPage::get_header(u_int16_t &size, u_int16_t &loc, RecordID id = 0);
+    u16 newSize = (u16) data->get_size();
+
+    if (newSize > size) {
+        u16 extra = newSize - size;
+
+        if (!has_room(extra)) {
+            throw DbBlockNoRoomError("Not enough space for record " + record_id);
+        }
+        slide(loc + newSize, loc + size);
+        memcpy(this->address(loc - extra), data->get_data(), newSize);
+    }else{
+        memcpy(this->address(loc - extra), data->get_data(), newSize);
+        slide(loc + newSize, loc);
+    }
+
+    get_header(size, loc, record_id);
+    put_header(record_id, newSize, loc);
+}
+
+/**
+ * Delete a record from this block.
+ * @param record_id  which record to delete
+ */
+void SlottedPage::del(RecordID record_id){
+    if (record_id > num_records) {
+        throw new DbRelationError("Invalid record id: " + record_id);
+    }
+
+    u16 size;
+    u16 loc;
+    get_header(size, loc, record_id);
+
+    slide(loc, loc + size);
+    put_header(record_id, 0, 0);
+}
+
+/**
+ * Get all the record ids in this block (excluding deleted ones).
+ * @returns  pointer to list of record ids (freed by caller)
+ */
+RecordIDs* SlottedPage::ids(void){
+    RecordIDs* ids = new RecordIDs;
+    for (RecordID i = 1; i <= last; i++)
+        ids->push_back(i);
+    return ids;
+}
+
+virtual void SlottedPage::get_header(u_int16_t &size, u_int16_t &loc, RecordID id = 0){
+    size = get_n(4 * id);
+    loc = get_n(4 * id + 2);
+}
 
 // Store the size and offset for given id. For id of zero, store the block header.
 void SlottedPage::put_header(RecordID id, u16 size, u16 loc) {
@@ -116,11 +172,36 @@ void SlottedPage::put_header(RecordID id, u16 size, u16 loc) {
     put_n(4*id + 2, loc);
 }
 
-// TODO
-bool SlottedPage::has_room(u_int16_t size);
+// Return true if there is room for param size
+bool SlottedPage::has_room(u_int16_t size){
+    return size - (this->end_free - (this->num_records + 1) * 4);
+}
 
-// TODO
-void SlottedPage::slide(u_int16_t start, u_int16_t end);
+
+void SlottedPage::slide(u_int16_t start, u_int16_t end){
+    u16 shift = end - start;
+
+    if (shift <= 0){
+        return;
+    }
+
+    // slide data
+    memcpy(this->end_free + 1 + shift, this->end_free + 1, shift - 1);
+
+    // fix headers
+    for(auto &record_id: *ids()){
+        u16 size, loc;
+        get_header(size, loc, id);
+
+        if(loc <= start){
+            loc += shift;
+            put_header(id, size, loc);
+        }
+    }
+
+    this->end_free += shift;
+    put_header();
+}
 
 // Get 2-byte integer at given offset in block.
 u16 SlottedPage::get_n(u16 offset) {
