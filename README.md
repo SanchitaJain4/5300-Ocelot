@@ -32,3 +32,7 @@ Made up of 3 layers:
 To test the rudimentary storage engine, first run sql5300 (see Milestone 1)  
 Then:  
 ```SQL> test```  
+
+### Hand-Off Video
+
+https://seattleu.instructuremedia.com/embed/444354bf-61e4-4e79-978a-8313b74d6de4
