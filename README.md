@@ -25,7 +25,9 @@ To quit:
 A rudimentary storage engine with heap file organization.  
 Uses slotted page block architecture (RecNo file type).  
 Made up of 3 layers:  
-    SlottedPage: A specific page/block  
-    HeapFile: Handles the collection of blocks in the relation  
-              Handles file creation, deletion, and access  
-    HeapTable: Represents the relation (logical view) of the table  
+- SlottedPage: A specific page/block  
+- HeapFile: Handles the collection of blocks in the relation  
+- HeapTable: Represents the relation (logical view) of the table  
+To test the rudimentary storage engine, first run sql5300 (see Milestone 1)  
+Then:  
+```SQL> test```  

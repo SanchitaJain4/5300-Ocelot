@@ -13,9 +13,12 @@
 #include <string>
 #include <db_cxx.h>
 #include "SQLParser.h"
+#include "heap_storage.h"
 
 using namespace std;
 using namespace hsql;
+
+DbEnv *_DB_ENV;
 
 string execute(const SQLStatement* parseTree);
 string parseSelect(SelectStatement* stmt);
@@ -56,13 +59,19 @@ int main(int argc, char* argv[]) {
         string input;
         getline(cin, input);
 
-        // End loop if user specifies "break"
-        if (input == "quit")
-            break;
-        
         // Skip blank lines
         if (input.length() < 1)
             continue;
+
+        // End loop if user specifies "break"
+        if (input == "quit")
+            break;
+
+        // Test rudimentary storage engine
+        if (input == "test") {
+            cout << "test_heap_storage: " << (test_heap_storage() ? "ok" : "failed") << endl;
+            continue;
+        }
 
         // Parse the response with SQLParser's ParseSQLString function
         SQLParserResult *result = SQLParser::parseSQLString(input);

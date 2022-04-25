@@ -25,6 +25,43 @@ typedef u_int16_t u16;
 
 // Test function -- returns true if all tests pass
 bool test_heap_storage() {
+    
+    // test SlottedPage
+    char block[DbBlock::BLOCK_SZ];
+    Dbt data(block, sizeof(block));
+    SlottedPage page(data, 1, true);
+
+    // test add
+    char rec[] = "Record";
+    Dbt record(rec, sizeof(rec));
+    RecordID record_id = page.add(&record);
+    std::cout << "Record id: " << record_id << std::endl;
+    std::cout << "add ok" << std::endl;
+    
+    // test get
+    std::string get_result = (char *)page.get(record_id)->get_data();
+    std::cout << "get result: " << get_result << std::endl;
+    std::cout << "get ok" << std::endl;
+
+    // test put
+    char new_rec[] = "New_Record";
+    record = Dbt(new_rec, sizeof(new_rec));
+    page.put(record_id, record);
+    std::string put_result = (char *)page.get(record_id)->get_data();
+    std::cout << "Replacing with new record..." << std::endl;
+    std::cout << "put result: " << put_result << std::endl;
+    std::cout << "Putting back old record..." << std::endl;
+    record = Dbt(rec, sizeof(rec));
+    page.put(record_id, record);
+    put_result = (char *)page.get(record_id)->get_data();
+    std::cout << "put result: " << put_result << std::endl;
+    std::cout << "put ok" << std::endl;
+
+    // test del
+    page.del(record_id);
+    std::cout << "del ok" << std::endl;
+    
+    // test HeapFile and HeapTable
 	ColumnNames column_names;
 	column_names.push_back("a");
 	column_names.push_back("b");
@@ -34,23 +71,38 @@ bool test_heap_storage() {
 	ca.set_data_type(ColumnAttribute::TEXT);
 	column_attributes.push_back(ca);
     HeapTable table1("_test_create_drop_cpp", column_names, column_attributes);
+
+    // test create
     table1.create();
     std::cout << "create ok" << std::endl;
+
+    // test open
+    table1.open();
+    std::cout << "open ok" << std::endl;
+
+    // test drop
     table1.drop();  // drop makes the object unusable because of BerkeleyDB restriction -- maybe want to fix this some day
     std::cout << "drop ok" << std::endl;
 
+    // test create_if_not_exists
     HeapTable table("_test_data_cpp", column_names, column_attributes);
     table.create_if_not_exists();
-    std::cout << "create_if_not_exsts ok" << std::endl;
+    std::cout << "create_if_not_exists ok" << std::endl;
 
     ValueDict row;
     row["a"] = Value(12);
     row["b"] = Value("Hello!");
     std::cout << "try insert" << std::endl;
+
+    // Test insert
     table.insert(&row);
     std::cout << "insert ok" << std::endl;
+
+    // Test select
     Handles* handles = table.select();
     std::cout << "select ok " << handles->size() << std::endl;
+
+    // Test project
     ValueDict *result = table.project((*handles)[0]);
     std::cout << "project ok" << std::endl;
     Value value = (*result)["a"];
@@ -59,6 +111,11 @@ bool test_heap_storage() {
     value = (*result)["b"];
     if (value.s != "Hello!")
 		return false;
+
+    // Test project with specific fields
+    result = table.project((*handles)[0], &column_names);
+    std::cout << "project with specific fields ok" << std::endl;
+
     table.drop();
 
     return true;
@@ -67,7 +124,10 @@ bool test_heap_storage() {
 
 // SlottedPage
 
-SlottedPage::SlottedPage(Dbt &block, BlockID block_id, bool is_new) : DbBlock(block, block_id, is_new) {
+SlottedPage::SlottedPage(Dbt &block,
+                         BlockID block_id,
+                         bool is_new)
+    : DbBlock(block, block_id, is_new) {
     if (is_new) {
         this->num_records = 0;
         this->end_free = DbBlock::BLOCK_SZ - 1;
@@ -91,6 +151,7 @@ RecordID SlottedPage::add(const Dbt* data) {
     return id;
 }
 
+// Get a record's data given its record id
 Dbt* SlottedPage::get(RecordID record_id){
     u16 size;
     u16 loc;
@@ -102,15 +163,14 @@ Dbt* SlottedPage::get(RecordID record_id){
     return new Dbt(data, size);
 }
 
-/*
- * Replace the current record with provided data
- */
+// Replace the current record with provided data
 void SlottedPage::put(RecordID record_id, const Dbt &data){
     u16 size;
     u16 loc;
+
     get_header(size, loc, record_id);
 
-    u16 newSize = (u16) data->get_size();
+    u16 newSize = (u16) data.get_size();
 
     if (newSize > size) {
         u16 extra = newSize - size;
@@ -118,21 +178,20 @@ void SlottedPage::put(RecordID record_id, const Dbt &data){
         if (!has_room(extra)) {
             throw DbBlockNoRoomError("Not enough space for record " + record_id);
         }
+        slide(loc, loc - extra);
+        memcpy(address(loc - extra), data.get_data(), newSize);
+    }
+    else{
+        memcpy(address(loc), data.get_data(), newSize);
         slide(loc + newSize, loc + size);
-        memcpy(this->address(loc - extra), data->get_data(), newSize);
-    }else{
-        memcpy(this->address(loc - extra), data->get_data(), newSize);
-        slide(loc + newSize, loc);
     }
 
     get_header(size, loc, record_id);
     put_header(record_id, newSize, loc);
 }
 
-/**
- * Delete a record from this block.
- * @param record_id  which record to delete
- */
+// Delete a record from this block.
+// record_id indicates which record to delete
 void SlottedPage::del(RecordID record_id){
     if (record_id > num_records) {
         throw new DbRelationError("Invalid record id: " + record_id);
@@ -146,18 +205,17 @@ void SlottedPage::del(RecordID record_id){
     put_header(record_id, 0, 0);
 }
 
-/**
- * Get all the record ids in this block (excluding deleted ones).
- * @returns  pointer to list of record ids (freed by caller)
- */
+// Get all the record ids in this block (excluding deleted ones).
+// returns pointer to list of record ids (freed by caller)
 RecordIDs* SlottedPage::ids(void){
     RecordIDs* ids = new RecordIDs;
-    for (RecordID i = 1; i <= last; i++)
+    for (RecordID i = 1; i <= num_records; i++)
         ids->push_back(i);
     return ids;
 }
 
-virtual void SlottedPage::get_header(u_int16_t &size, u_int16_t &loc, RecordID id = 0){
+// Get the size and offset of a record given it's id (defaults to block header)
+void SlottedPage::get_header(u_int16_t &size, u_int16_t &loc, RecordID id){
     size = get_n(4 * id);
     loc = get_n(4 * id + 2);
 }
@@ -177,7 +235,7 @@ bool SlottedPage::has_room(u_int16_t size){
     return size - (this->end_free - (this->num_records + 1) * 4);
 }
 
-
+// Slide data to the left or right
 void SlottedPage::slide(u_int16_t start, u_int16_t end){
     u16 shift = end - start;
 
@@ -186,16 +244,18 @@ void SlottedPage::slide(u_int16_t start, u_int16_t end){
     }
 
     // slide data
-    memcpy(this->end_free + 1 + shift, this->end_free + 1, shift - 1);
+    memcpy((address((u16)(end_free + 1 + shift))), 
+           (address((u16)end_free + 1)),
+           (start - end_free - 1));
 
     // fix headers
     for(auto &record_id: *ids()){
         u16 size, loc;
-        get_header(size, loc, id);
+        get_header(size, loc, record_id);
 
-        if(loc <= start){
+        if(loc != 0 && loc <= start){
             loc += shift;
-            put_header(id, size, loc);
+            put_header(record_id, size, loc);
         }
     }
 
@@ -232,7 +292,8 @@ void HeapFile::create(void) {
 void HeapFile::drop(void) {
     close();
     const char* file_name = dbfilename.c_str();
-    int result = std::remove(file_name);
+    Db db(_DB_ENV, 0);
+    int result = db.remove(file_name, nullptr, 0);
     if (result != 0)
         throw std::string("Failed to delete file: ") + file_name;
 }
@@ -311,7 +372,9 @@ void HeapFile::db_open(uint flags) {
 // HeapTable constructor
 // Takes the name of the relation, the columns (in order), and all the column attributes
 // This information is tracked by the schema storage
-HeapTable::HeapTable(Identifier table_name, ColumnNames column_names, ColumnAttributes column_attributes)
+HeapTable::HeapTable(Identifier table_name,
+                     ColumnNames column_names,
+                     ColumnAttributes column_attributes)
     : DbRelation(table_name, column_names, column_attributes), file(table_name) {}
 
 // Sets up the DbFile and calls its create method
